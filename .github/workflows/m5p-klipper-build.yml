@@ -1,0 +1,46 @@
+name: Build Manta M5P Klipper firmware
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/m5p-klipper-build.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git make python3 gcc-arm-none-eabi binutils-arm-none-eabi
+      - name: Clone Klipper
+        run: |
+          git clone https://github.com/Klipper3d/klipper.git
+          cd klipper
+          git checkout 7bc4d09465d31cd30fc0822e8d0abe02cc8c547f
+      - name: Configure Manta M5P USB firmware
+        run: |
+          cd klipper
+          cat > .config <<'EOF'
+          CONFIG_LOW_LEVEL_OPTIONS=y
+          CONFIG_MACH_STM32=y
+          CONFIG_MACH_STM32G0B1=y
+          CONFIG_STM32_FLASH_START_2000=y
+          CONFIG_STM32_CLOCK_REF_8M=y
+          CONFIG_STM32_USB_PA11_PA12=y
+          EOF
+          make olddefconfig
+          cat .config
+      - name: Build firmware
+        run: |
+          cd klipper
+          make -j2
+          cp out/klipper.bin ../firmware.bin
+          sha256sum ../firmware.bin
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: Manta-M5P-Klipper-firmware
+          path: firmware.bin
+          if-no-files-found: error
